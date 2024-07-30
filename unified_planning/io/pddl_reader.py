@@ -101,7 +101,7 @@ class PDDLGrammar:
             + ":requirements"
             + OneOrMore(
                 one_of(
-                    ":strips :typing :negative-preconditions :disjunctive-preconditions :equality :existential-preconditions :universal-preconditions :quantified-preconditions :conditional-effects :fluents :numeric-fluents :adl :durative-actions :duration-inequalities :timed-initial-literals :timed-initial-effects :action-costs :hierarchy :method-preconditions :constraints :contingent :preferences"
+                    ":non-deterministic :strips :typing :negative-preconditions :disjunctive-preconditions :equality :existential-preconditions :universal-preconditions :quantified-preconditions :conditional-effects :fluents :numeric-fluents :adl :durative-actions :duration-inequalities :timed-initial-literals :timed-initial-effects :action-costs :hierarchy :method-preconditions :constraints :contingent :preferences"
                 )
             )
             + Suppress(")")
@@ -577,6 +577,9 @@ class PDDLReader:
                 continue  # ignore the case where the effect list is empty, e.g., `:effect ()`
             op = exp[0].value
             if op == "and":
+                for i in range(1, len(exp)):
+                    to_add.append((exp[i], cond, forall_variables))
+            elif op == "oneof":
                 for i in range(1, len(exp)):
                     to_add.append((exp[i], cond, forall_variables))
             elif op == "when":
@@ -1208,7 +1211,29 @@ class PDDLReader:
             task = htn.Task(name, task_params)
             problem.add_task(task)
 
-        for a in domain_res.get("actions", []):
+        # remove oneofs from actions
+        old_actions = [a for a in domain_res.get("actions", [])]
+        actions = []
+        while len(old_actions) > 0:
+            a = old_actions.pop()
+            name = a.name
+            head = CustomParseResults(a.eff[0])
+            if head[0].value == "oneof":
+                assert ":non-deterministic" in set(domain_res.get("features", []))
+                for i in range(1, len(head)):
+                    new_acc = a.deepcopy()
+                    new_acc["name"] = "{name}_differ{index}".format(name=name, index=i)
+                    new_acc["eff"] = [head[i].res]
+                    actions.append(new_acc)
+            else:
+                modified = False
+                action_stack = [head]
+                while len(action_stack) > 0:
+                    pass
+
+                actions.append(a)
+
+        for a in actions:
             n = a["name"]
             a_params = OrderedDict()
             for g in a.get("params", []):
@@ -1312,6 +1337,8 @@ class PDDLReader:
                         )
                     )
                 if "eff" in a:
+                    # print("EFF")
+                    # print(CustomParseResults(a.eff[0])[0].value)
                     self._add_effect(
                         problem,
                         act,
