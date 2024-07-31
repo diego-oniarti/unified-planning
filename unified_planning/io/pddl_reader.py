@@ -1210,11 +1210,11 @@ class PDDLReader:
             problem.add_task(task)
 
         # remove oneofs from actions
+        # stack on actions that could contain a oneof
         old_actions = [a for a in domain_res.get("actions", [])]
+        # list of actions that do not contain a oneof
         actions = []
         while len(old_actions) > 0:
-            print("ITER")
-
             a = old_actions.pop()
             name = a.name
             head = CustomParseResults(a.eff[0])
@@ -1227,34 +1227,37 @@ class PDDLReader:
                     old_actions.append(new_acc)
             else:
                 found_oneof = False
-                action_queue = [head]
+                # queue for the level visit of the effect (seen as a tree)
+                effect_queue = [head]
+                # the different values the oneof (if present) can produce
                 options = []
-                while len(action_queue) > 0 and not found_oneof:
-                    current = action_queue.pop(0)
+                while len(effect_queue) > 0 and not found_oneof:  # break as soon as one oneof is found
+                    current = effect_queue.pop(0)
                     op = current[0].value
                     if op == "and":
                         for i in range(1, len(current)):
-                            action_queue.append(current[i])
+                            effect_queue.append(current[i])
                     elif op == "when":
-                        action_queue.append(current[2])
+                        effect_queue.append(current[2])
                     elif op == "oneof":
                         found_oneof = True
                         for i in range(1, len(current)):
                             options.append(current[i])
 
                 if not found_oneof:
-                    print("resolution")
+                    # The action needs no firther modification
                     actions.append(a)
                     continue
+                else:
+                    assert ":non-deterministic" in set(domain_res.get("features", []))
 
                 for i in range(0, len(options)):
                     new_acc = copy.deepcopy(a.deepcopy())
-
                     new_acc["name"] = "{name}_differ{index}".format(name=name, index=i)
-
-                    effect_queue = [new_acc["eff"][0]]
+                    # Visit the tree again to find the oneof
+                    effect_queue = [CustomParseResults(new_acc["eff"][0])]
                     modified = False
-                    while len(effect_queue) > 0 and not modified:
+                    while len(effect_queue) > 0 and not modified:  # break out of the visit as soon as you modify the tree
                         current = effect_queue.pop(0)
                         op = current.value[0].value[0]
                         if op == "and":
@@ -1264,11 +1267,15 @@ class PDDLReader:
                                     current.value[j] = options[i].res
                                     modified = True
                                 else:
-                                    effect_queue.append(current[j])
+                                    effect_queue.append(current.value[j])
 
                                 j += 1
                         elif op == "when":
-                            pass
+                            if current.value[2].value[0].value[0] == "oneof":
+                                current.value[2] = options[i].res
+                                modified = True
+                            else:
+                                effect_queue.append(current[2])
                     old_actions.append(new_acc)
 
         for a in actions:
@@ -1375,8 +1382,6 @@ class PDDLReader:
                         )
                     )
                 if "eff" in a:
-                    # print("EFF")
-                    # print(CustomParseResults(a.eff[0])[0].value)
                     self._add_effect(
                         problem,
                         act,
