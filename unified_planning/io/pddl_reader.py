@@ -36,6 +36,7 @@ from pyparsing import ParseResults
 from pyparsing import CharsNotIn, Empty, col, lineno
 from pyparsing import Word, alphanums, alphas, ZeroOrMore, OneOrMore, Keyword
 from pyparsing import Suppress, Group, Optional, Forward
+import copy
 
 if pyparsing.__version__ < "3.0.0":
     from pyparsing import oneOf as one_of
@@ -1212,6 +1213,8 @@ class PDDLReader:
         old_actions = [a for a in domain_res.get("actions", [])]
         actions = []
         while len(old_actions) > 0:
+            print("ITER")
+
             a = old_actions.pop()
             name = a.name
             head = CustomParseResults(a.eff[0])
@@ -1240,20 +1243,31 @@ class PDDLReader:
                             options.append(current[i])
 
                 if not found_oneof:
+                    print("resolution")
                     actions.append(a)
                     continue
 
                 for i in range(0, len(options)):
-                    new_acc = a.deepcopy()
+                    new_acc = copy.deepcopy(a.deepcopy())
+
                     new_acc["name"] = "{name}_differ{index}".format(name=name, index=i)
-                    effect_queue = [CustomParseResults(new_acc["eff"][0])]
+
+                    effect_queue = [new_acc["eff"][0]]
                     modified = False
                     while len(effect_queue) > 0 and not modified:
                         current = effect_queue.pop(0)
-                        op = current[0].value
+                        op = current.value[0].value[0]
                         if op == "and":
-                            pass
-                        if op == "when":
+                            j = 1
+                            while j < len(current) and not modified:
+                                if current.value[j].value[0].value[0] == "oneof":
+                                    current.value[j] = options[i].res
+                                    modified = True
+                                else:
+                                    effect_queue.append(current[j])
+
+                                j += 1
+                        elif op == "when":
                             pass
                     old_actions.append(new_acc)
 
