@@ -1,3 +1,4 @@
 pyparsing
 networkx
 ConfigSpace
+numpy<2

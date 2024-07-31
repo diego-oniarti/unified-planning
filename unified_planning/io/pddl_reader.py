@@ -579,9 +579,6 @@ class PDDLReader:
             if op == "and":
                 for i in range(1, len(exp)):
                     to_add.append((exp[i], cond, forall_variables))
-            elif op == "oneof":
-                for i in range(1, len(exp)):
-                    to_add.append((exp[i], cond, forall_variables))
             elif op == "when":
                 cond = self._parse_exp(
                     problem, act, types_map, forall_variables, exp[1], complete_str
@@ -1224,14 +1221,41 @@ class PDDLReader:
                     new_acc = a.deepcopy()
                     new_acc["name"] = "{name}_differ{index}".format(name=name, index=i)
                     new_acc["eff"] = [head[i].res]
-                    actions.append(new_acc)
+                    old_actions.append(new_acc)
             else:
-                modified = False
-                action_stack = [head]
-                while len(action_stack) > 0:
-                    pass
+                found_oneof = False
+                action_queue = [head]
+                options = []
+                while len(action_queue) > 0 and not found_oneof:
+                    current = action_queue.pop(0)
+                    op = current[0].value
+                    if op == "and":
+                        for i in range(1, len(current)):
+                            action_queue.append(current[i])
+                    elif op == "when":
+                        action_queue.append(current[2])
+                    elif op == "oneof":
+                        found_oneof = True
+                        for i in range(1, len(current)):
+                            options.append(current[i])
 
-                actions.append(a)
+                if not found_oneof:
+                    actions.append(a)
+                    continue
+
+                for i in range(0, len(options)):
+                    new_acc = a.deepcopy()
+                    new_acc["name"] = "{name}_differ{index}".format(name=name, index=i)
+                    effect_queue = [CustomParseResults(new_acc["eff"][0])]
+                    modified = False
+                    while len(effect_queue) > 0 and not modified:
+                        current = effect_queue.pop(0)
+                        op = current[0].value
+                        if op == "and":
+                            pass
+                        if op == "when":
+                            pass
+                    old_actions.append(new_acc)
 
         for a in actions:
             n = a["name"]
