@@ -1221,7 +1221,7 @@ class PDDLReader:
             if head[0].value == "oneof":
                 assert ":non-deterministic" in set(domain_res.get("features", []))
                 for i in range(1, len(head)):
-                    new_acc = a.deepcopy()
+                    new_acc = copy.deepcopy(a.deepcopy())
                     new_acc["name"] = "{name}_differ{index}".format(name=name, index=i)
                     new_acc["eff"] = [head[i].res]
                     old_actions.append(new_acc)
@@ -1237,7 +1237,7 @@ class PDDLReader:
                     if op == "and":
                         for i in range(1, len(current)):
                             effect_queue.append(current[i])
-                    elif op == "when":
+                    elif op == "when" or op == "forall":
                         effect_queue.append(current[2])
                     elif op == "oneof":
                         found_oneof = True
@@ -1270,7 +1270,7 @@ class PDDLReader:
                                     effect_queue.append(current.value[j])
 
                                 j += 1
-                        elif op == "when":
+                        elif op == "when" or op == "forall":
                             if current.value[2].value[0].value[0] == "oneof":
                                 current.value[2] = options[i].res
                                 modified = True

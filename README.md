@@ -1,3 +1,14 @@
+This is a fork of the Unified Planning Library that adds some level of support for non-deterministic domains.
+The 'oneof' construct divides the action in multiple actions having one of the effects.
+```
+(action name :parameters() :precondition() :effect(oneof( (A) (B) )))
+```
+becomes
+```
+(action name_differ0 :parameters() :precondition() :effect(A))
+(action name_differ1 :parameters() :precondition() :effect(B))
+```
+
 # The AIPlan4EU Unified Planning Library
 
 [![Actions Status](https://github.com/aiplan4eu/unified-planning/actions/workflows/release.yml/badge.svg)](https://github.com/aiplan4eu/unified-planning/actions)
